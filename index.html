@@ -1,53 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Student Progress Tracker (TV View)</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Student Progress Tracker (Exact View)</title>
   <style>
     :root {
-      /* Adjust these if you want to scale the sheet up/down on your TV */
-      --sheet-scale: 1;      /* 1 = 100%, try 1.1 or 0.9 if needed */
-      --bg: #0b0c0f;         /* nice dark background for TVs */
+      /* tweak to make it fill your TV nicely, e.g. 0.95 or 1.1 */
+      --sheet-scale: 1;
+      --bg: #0b0c0f;
     }
     html, body {
       height: 100%;
       margin: 0;
       background: var(--bg);
-      overflow: hidden;      /* no scrollbars around the frame */
+      overflow: hidden;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
     }
-    .wrap {
+    .stage {
       position: fixed;
       inset: 0;
       display: grid;
       place-items: center;
     }
-    .iframe-frame {
+    .frame {
       width: 100vw;
       height: 100vh;
       transform: scale(var(--sheet-scale));
       transform-origin: center center;
-      /* When scaling up, hide any potential overflow (no bars) */
+      border: none;
       overflow: hidden;
-      border: none;
-    }
-    iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-      /* Display-only: block clicks so nobody fiddles with the sheet on the TV */
+      /* display-only on TV */
       pointer-events: none;
     }
-
-    /* Optional: show a tiny “last updated” badge in a corner */
     .stamp {
       position: fixed;
       right: 10px;
       bottom: 8px;
-      font: 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      font-size: 12px;
       color: #aab1c2;
-      opacity: 0.7;
-      background: rgba(0,0,0,0.35);
+      opacity: 0.75;
+      background: rgba(0,0,0,.35);
       padding: 6px 8px;
       border-radius: 6px;
       user-select: none;
@@ -56,61 +49,43 @@
   </style>
 </head>
 <body>
-  <div class="wrap">
+  <div class="stage">
     <iframe
       id="sheet"
-      class="iframe-frame"
+      class="frame"
+      allowfullscreen
       referrerpolicy="no-referrer"
       sandbox="allow-same-origin allow-scripts allow-popups"
-      allowfullscreen
-      loading="eager"
-      src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRTW5UzVfnAcBJdW9fSL7SXFc0wtUV5ftFWKaFExTPhq7FTv5QZ0rHqjs4sLlBnFHzCi0ThHMzV3rT_/pubhtml?gid=1926586971&single=true&widget=true&chrome=false">
+      src="https://docs.google.com/spreadsheets/d/1kMUQNlHimoQsSFUhKcZFC92ZNq835UMR_40AP08_7tY/preview#gid=1926586971">
     </iframe>
   </div>
-
-  <div class="stamp" id="stamp">Loading…</div>
+  <div id="stamp" class="stamp">Loading…</div>
 
   <script>
-    // Hard-refresh the published sheet every 2 minutes with a cache-buster.
-    const IFRAME_ID = "sheet";
-    const STAMP_ID = "stamp";
-    const REFRESH_MS = 120_000; // 2 minutes
-
-    const iframe = document.getElementById(IFRAME_ID);
-    const stamp = document.getElementById(STAMP_ID);
+    const iframe = document.getElementById('sheet');
+    const stamp  = document.getElementById('stamp');
+    const REFRESH_MS = 120000; // 2 minutes
 
     function updateStamp() {
-      const d = new Date();
-      // Show local time so staff can see it has refreshed
-      stamp.textContent = "Last refresh: " + d.toLocaleString();
+      stamp.textContent = 'Last refresh: ' + new Date().toLocaleString();
     }
 
-    function reloadFrame() {
-      // Keep the base URL clean, append a cache-busting param
-      const base = iframe.dataset.base || iframe.src.split("#")[0].split("?")[0];
-      const search = new URLSearchParams(
-        (iframe.src.split("?")[1] || "").replace(/#.*/,'')
-      );
-
-      // Preserve existing params (&widget=true&chrome=false&gid=...)
-      // and append a timestamp to avoid caching
-      search.set("_t", Date.now().toString());
-
-      // If you only want to show a certain range, you can also add:
-      // search.set("range", "A1:Z200");
-
-      const next = `${base}?${search.toString()}`;
-      iframe.dataset.base = base;
-      iframe.src = next;
+    function reloadPreservingGid() {
+      // Preserve #gid (and any other hash) while cache-busting the preview URL.
+      const url = new URL(iframe.src, window.location.origin);
+      const hash = url.hash;            // e.g. #gid=1926586971
+      url.hash = '';                    // clear hash while we set query
+      url.search = '?t=' + Date.now();  // cache buster
+      iframe.src = url.toString() + (hash || '');
       updateStamp();
     }
 
-    // Initial stamp once the page finishes loading
-    window.addEventListener('load', updateStamp);
-
-    // First reload shortly after load to ensure fresh content, then every 2 mins
-    setTimeout(reloadFrame, 2500);
-    setInterval(reloadFrame, REFRESH_MS);
+    // First quick refresh after load, then every 2 minutes
+    window.addEventListener('load', () => {
+      updateStamp();
+      setTimeout(reloadPreservingGid, 2500);
+      setInterval(reloadPreservingGid, REFRESH_MS);
+    });
   </script>
 </body>
 </html>
